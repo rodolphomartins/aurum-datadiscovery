@@ -38,9 +38,6 @@ class ColumnProfile:
     avgValue: float = 0.0
     median: float = 0.0
     iqr: float = 0.0
-    # Optional enrichment
-    description: Optional[str] = None
-
 
 def compute_nid(db_name: str, source_name: str, column_name: str) -> str:
     raw = db_name + source_name + column_name
@@ -95,7 +92,6 @@ def profile(sample: ColumnSample, db_name: str, num_perm: int = 128) -> ColumnPr
         uniquenessRatio=uniqueness,
         minhash=minhash,
         tokens=tokens,
-        description=meta.description,
     )
 
     if sample.numeric_stats is not None:

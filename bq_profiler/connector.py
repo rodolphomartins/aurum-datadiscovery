@@ -29,8 +29,6 @@ class ColumnMeta:
     table: str
     column: str
     data_type: str          # BQ data type string, e.g. "STRING", "INT64"
-    description: Optional[str] = None
-
 
 @dataclass
 class NumericStats:
@@ -80,8 +78,7 @@ def get_columns(
             dataset=dataset,
             table=row.table_name,
             column=row.column_name,
-            data_type=row.data_type,
-            description=row.description,
+            data_type=row.data_type
         )
 
 

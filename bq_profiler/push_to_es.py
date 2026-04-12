@@ -39,9 +39,6 @@ def push_profiles(
             "median": p.median,
             "iqr": p.iqr,
         }
-        if p.description:
-            doc["description"] = p.description
-        es.index(index=index, id=p.id, body=doc)
 
 
 def push_text_index(
