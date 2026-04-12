@@ -1,0 +1,24 @@
+# Aurum BQ Profiler — dataset config template
+# Copy this file, fill in your values, and pass it to:
+#   python -m bq_profiler.cli --config your_config.yaml
+
+bigquery:
+  project: "your-gcp-project-id"
+  dataset: "your_dataset"
+  tables:
+    - "table_one"
+    - "table_two"
+    - "table_three"
+
+# Namespace label used in the EKG — typically the dataset name
+db_name: "your_dataset"
+
+# Percentage of rows to sample for MinHash content signatures.
+# BigQuery charges per bytes scanned.
+# 1.0 = 1% sample (cheap, good for exploration)
+# 10.0 = 10% sample (better recall for rare values, ~10x more expensive)
+sample_pct: 1.0
+
+elasticsearch:
+  host: "localhost"
+  port: 9200

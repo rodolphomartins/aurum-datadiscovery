@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "aurum-datadiscovery"
+version = "0.1.0"
+requires-python = ">=3.8"
+dependencies = [
+    "google-cloud-bigquery",
+    "datasketch",
+    "elasticsearch>=7.0.0,<8.0.0",
+    "PyYAML",
+]
+
+[project.scripts]
+bq-profile = "bq_profiler.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bq_profiler*"]
