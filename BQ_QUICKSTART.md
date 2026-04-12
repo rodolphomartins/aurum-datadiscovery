@@ -305,6 +305,19 @@ The original `docker-compose.yml` includes containers for the Java profiler and 
 
 ---
 
+## Security notes
+
+**Sampled data stored locally in Elasticsearch**
+The `text` index in Elasticsearch stores actual sampled column values from your BigQuery tables. Elasticsearch 6.x has no authentication or encryption by default. The `bq_profiler` enforces that ES must be `localhost` — pushing to a remote ES instance is blocked at runtime. Do not expose port 9200 outside your machine (check with `docker ps` that no ports are bound to `0.0.0.0`).
+
+**EKG pickle files contain column metadata**
+The pickled files in `data/models/` contain column names, uniqueness ratios, and MinHash signatures — not raw data values, but still internal schema information. Do not share or commit these files. They are gitignored by default. Never load `.pickle` files from untrusted sources (Python pickle allows arbitrary code execution on load).
+
+**BigQuery credentials**
+Authentication uses Application Default Credentials (`gcloud auth application-default login`). No credentials are stored in this repo or config files. The BQ client uses HTTPS for all queries.
+
+---
+
 ## Troubleshooting
 
 **ES connection refused**

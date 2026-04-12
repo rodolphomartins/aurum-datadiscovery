@@ -22,6 +22,9 @@ def load_config(path: str) -> dict:
         return yaml.safe_load(f)
 
 
+_LOCALHOST_ALIASES = {"localhost", "127.0.0.1", "::1"}
+
+
 def run(config_path: str, sample_pct: float = None, dry_run: bool = False):
     cfg = load_config(config_path)
 
@@ -31,8 +34,17 @@ def run(config_path: str, sample_pct: float = None, dry_run: bool = False):
     db_name = cfg.get("db_name", dataset)
     effective_sample_pct = sample_pct if sample_pct is not None else cfg.get("sample_pct", 1.0)
 
+    if not (0 < effective_sample_pct <= 100):
+        raise ValueError(f"sample_pct must be between 0 (exclusive) and 100 (inclusive), got {effective_sample_pct}")
+
     es_host = cfg.get("elasticsearch", {}).get("host", "localhost")
     es_port = cfg.get("elasticsearch", {}).get("port", 9200)
+
+    if es_host not in _LOCALHOST_ALIASES:
+        raise ValueError(
+            f"ES host '{es_host}' is not localhost. Pushing sampled production data to a "
+            f"remote Elasticsearch instance is not allowed. Use localhost only."
+        )
 
     bq_client = bigquery.Client(project=bq_project)
     es = Elasticsearch([{"host": es_host, "port": es_port}])

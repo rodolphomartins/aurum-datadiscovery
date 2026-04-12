@@ -17,6 +17,11 @@ def is_text_type(bq_data_type: str) -> bool:
     return bq_data_type.upper() in _TEXT_TYPES
 
 
+def _safe_column(name: str) -> str:
+    """Escape backticks in column/table names for use in BQ SQL identifiers."""
+    return name.replace("`", "\\`")
+
+
 @dataclass
 class ColumnMeta:
     project: str
@@ -91,13 +96,14 @@ def sample_column(
     Sample text column values and compute cardinality.
     Costs BQ scan proportional to sample_pct.
     """
+    col = _safe_column(meta.column)
     fqtn = f"`{meta.project}.{meta.dataset}.{meta.table}`"
 
     sample_query = f"""
-    SELECT CAST(`{meta.column}` AS STRING) AS val
+    SELECT CAST(`{col}` AS STRING) AS val
     FROM {fqtn}
     TABLESAMPLE SYSTEM ({sample_pct} PERCENT)
-    WHERE `{meta.column}` IS NOT NULL
+    WHERE `{col}` IS NOT NULL
     LIMIT {limit}
     """
     values = [row.val for row in client.query(sample_query).result()]
@@ -105,10 +111,10 @@ def sample_column(
     # HyperLogLog cardinality — scans full table but BQ makes this cheap
     card_query = f"""
     SELECT
-        APPROX_COUNT_DISTINCT(`{meta.column}`) AS approx_distinct,
+        APPROX_COUNT_DISTINCT(`{col}`) AS approx_distinct,
         COUNT(*) AS total_count
     FROM {fqtn}
-    WHERE `{meta.column}` IS NOT NULL
+    WHERE `{col}` IS NOT NULL
     """
     row = next(iter(client.query(card_query).result()))
 
@@ -129,19 +135,20 @@ def sample_numeric_column(
     Single query: cardinality + min/max/avg/quantiles.
     Scans full column — no TABLESAMPLE (stats need full distribution).
     """
+    col = _safe_column(meta.column)
     fqtn = f"`{meta.project}.{meta.dataset}.{meta.table}`"
 
     # APPROX_QUANTILES(x, 4) returns [0%, 25%, 50%, 75%, 100%]
     query = f"""
     SELECT
-        APPROX_COUNT_DISTINCT(`{meta.column}`)          AS approx_distinct,
-        COUNT(*)                                         AS total_count,
-        MIN(CAST(`{meta.column}` AS FLOAT64))            AS min_value,
-        MAX(CAST(`{meta.column}` AS FLOAT64))            AS max_value,
-        AVG(CAST(`{meta.column}` AS FLOAT64))            AS avg_value,
-        APPROX_QUANTILES(CAST(`{meta.column}` AS FLOAT64), 4) AS quantiles
+        APPROX_COUNT_DISTINCT(`{col}`)          AS approx_distinct,
+        COUNT(*)                                 AS total_count,
+        MIN(CAST(`{col}` AS FLOAT64))            AS min_value,
+        MAX(CAST(`{col}` AS FLOAT64))            AS max_value,
+        AVG(CAST(`{col}` AS FLOAT64))            AS avg_value,
+        APPROX_QUANTILES(CAST(`{col}` AS FLOAT64), 4) AS quantiles
     FROM {fqtn}
-    WHERE `{meta.column}` IS NOT NULL
+    WHERE `{col}` IS NOT NULL
     """
     row = next(iter(client.query(query).result()))
     q = list(row.quantiles)  # [min, q25, median, q75, max]
