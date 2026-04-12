@@ -168,12 +168,14 @@ docker-compose up -d elasticsearch
 
 ### Step 2 — Create your dataset config
 
-Copy the example template:
+Config files live in `bq_profiler/configs/`. Copy the example template:
 ```bash
-cp bq_profiler/configs/example.yaml my_config.yaml
+cp bq_profiler/configs/example.yaml bq_profiler/configs/my_dataset.yaml
 ```
 
-Edit `my_config.yaml`:
+Files matching `bq_profiler/configs/*.yaml` (except `example.yaml`) are gitignored — your dataset names will not be committed.
+
+Edit `bq_profiler/configs/my_dataset.yaml`:
 ```yaml
 bigquery:
   project: "your-gcp-project-id"
@@ -200,14 +202,14 @@ Start with a small set of tables (5–10) to validate the pipeline before profil
 With your virtual environment active:
 
 ```bash
-python -m bq_profiler.cli --config my_config.yaml --dry_run
+python -m bq_profiler.cli --config bq_profiler/configs/my_dataset.yaml --dry_run
 ```
 
 `--dry_run` computes profiles and prints them without writing to Elasticsearch. Use this to verify BQ connectivity and check uniqueness ratios before committing to a full run.
 
 When satisfied:
 ```bash
-python -m bq_profiler.cli --config my_config.yaml
+python -m bq_profiler.cli --config bq_profiler/configs/my_dataset.yaml
 ```
 
 Expected output:
