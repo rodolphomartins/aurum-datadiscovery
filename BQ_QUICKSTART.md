@@ -80,21 +80,29 @@ Colima must be running whenever you use Elasticsearch. It does not start automat
 
 The Python components (`bq_profiler`, `networkbuildercoordinator.py`, Aurum API) run on your machine — not inside Docker. A virtual environment is required to avoid dependency conflicts with Aurum's pinned packages.
 
-Python 3.8 or higher is required.
+Python 3.10 is required. If you use `pyenv`:
 
 ```bash
-python3 -m venv .venv
+pyenv install 3.10
+pyenv local 3.10      # writes .python-version — already present in this repo
+```
+
+Create and activate a virtual environment:
+```bash
+python3.10 -m venv .venv
 source .venv/bin/activate          # macOS / Linux
 # .venv\Scripts\activate           # Windows
 ```
 
-Install all dependencies:
+Install dependencies using the lean requirements file (excludes web server, databases, RDF tools):
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-lite.txt
 pip install -e .
 ```
 
 The `-e .` installs `bq_profiler` as an editable package so it can be imported from anywhere.
+
+> **Note:** The original `requirements.txt` is kept for reference but contains many dependencies not needed for BigQuery usage (Flask, Django, uWSGI, PostgreSQL, MongoDB, Neo4j, etc.). Use `requirements-lite.txt` for all new setups.
 
 ### Google Cloud SDK (for BigQuery access)
 

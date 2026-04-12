@@ -1,0 +1,29 @@
+# Aurum Lite — minimal requirements for bq_profiler + networkbuilder + query API
+# Python 3.10 required. Install with: pip install -r requirements-lite.txt
+#
+# Excludes: web server (Flask/Django/uWSGI), databases (Postgres/MongoDB/Neo4j),
+# RDF/ontology tools, Java compat libs, and dev/profiling tools.
+# nearpy and dataanalysis are vendored in the repo — no install needed.
+
+# --- EKG / networkbuilder ---
+networkx>=2.0,<3.0          # 3.x removed nx.write_gpickle used in fieldnetwork.py
+numpy>=1.21
+scipy>=1.7
+scikit-learn>=1.0
+matplotlib>=3.4
+bitarray>=2.3
+
+# --- Elasticsearch client ---
+elasticsearch>=7.0.0,<8.0.0
+
+# --- MinHash (profiler + networkbuilder) ---
+datasketch>=1.6.0
+
+# --- BigQuery profiler ---
+google-cloud-bigquery>=3.0.0
+google-auth>=2.0.0
+PyYAML>=5.1
+
+# --- Notebook / interactive ---
+jupyter>=1.0
+ipython>=7.0

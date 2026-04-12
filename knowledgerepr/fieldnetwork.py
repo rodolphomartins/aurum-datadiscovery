@@ -153,8 +153,8 @@ class FieldNetwork:
         self.__G.add_edge(node_src, node_target, relation, score)
 
     def fields_degree(self, topk):
-        degree = nx.degree(self.__G)
-        sorted_degree = sorted(degree.items(), key=operator.itemgetter(1))
+        degree = self.__G.degree()
+        sorted_degree = sorted(degree, key=operator.itemgetter(1))
         sorted_degree.reverse()
         topk_nodes = sorted_degree[:topk]
         return topk_nodes
