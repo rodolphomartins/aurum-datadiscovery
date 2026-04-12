@@ -113,6 +113,7 @@ def run(config_path: str, dry_run: bool = False):
                 print(f"SKIP (partition filter required but column unresolvable: {e})")
                 continue
             print(f"retrying with partition filter on '{fallback.column}' (view metadata gap) ... ", end="")
+            partition_map[col_meta.table] = fallback  # cache: remaining columns skip the error path
             if is_text:
                 sample = sample_column(bq_client, col_meta, limit=sample_limit, partition_col=fallback)
             else:
