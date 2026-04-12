@@ -9,6 +9,7 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+.venv/
 .Python
 env/
 build/
@@ -71,6 +72,10 @@ ddprofiler/.settings/
 
 # Notes
 notes.sh
+
+# BQ dataset configs (contain project/dataset names — keep out of repo)
+bq_profiler/configs/*.yaml
+!bq_profiler/configs/example.yaml
 
 # Index Pickle Files
 /test/testmodel/*.pickle
