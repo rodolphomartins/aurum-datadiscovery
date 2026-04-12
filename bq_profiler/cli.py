@@ -12,7 +12,7 @@ import yaml
 from google.cloud import bigquery
 from elasticsearch import Elasticsearch
 
-from bq_profiler.connector import get_columns, sample_column, sample_numeric_column, is_text_type
+from bq_profiler.connector import get_columns, build_partition_map, sample_column, sample_numeric_column, is_text_type
 from bq_profiler.profiler import profile
 from bq_profiler.push_to_es import push_profiles, push_text_index
 
@@ -50,7 +50,10 @@ def run(config_path: str, dry_run: bool = False):
     es = Elasticsearch([{"host": es_host, "port": es_port}])
 
     columns = list(get_columns(bq_client, data_project, dataset, tables))
+    partition_map = build_partition_map(columns)
     print(f"Found {len(columns)} columns across {len(tables)} tables.")
+    if partition_map:
+        print(f"Partition columns detected: { {t: c.column for t, c in partition_map.items()} }")
 
     profiles = []
     samples_by_id = {}  # profile.id -> List[str] values, for text index
@@ -59,10 +62,11 @@ def run(config_path: str, dry_run: bool = False):
         is_text = is_text_type(col_meta.data_type)
         print(f"  {'T' if is_text else 'N'} {col_meta.table}.{col_meta.column} ...", end=" ")
 
+        partition_col = partition_map.get(col_meta.table)
         if is_text:
-            sample = sample_column(bq_client, col_meta, limit=sample_limit)
+            sample = sample_column(bq_client, col_meta, limit=sample_limit, partition_col=partition_col)
         else:
-            sample = sample_numeric_column(bq_client, col_meta)
+            sample = sample_numeric_column(bq_client, col_meta, partition_col=partition_col)
 
         p = profile(sample, db_name=db_name)
         profiles.append(p)
