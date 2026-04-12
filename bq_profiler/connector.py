@@ -64,8 +64,7 @@ def get_columns(
     SELECT
         table_name,
         column_name,
-        data_type,
-        description
+        data_type
     FROM `{data_project}.{dataset}.INFORMATION_SCHEMA.COLUMNS`
     WHERE table_name IN UNNEST(@tables)
     ORDER BY table_name, ordinal_position
