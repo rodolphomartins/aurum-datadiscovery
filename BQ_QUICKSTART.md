@@ -56,16 +56,25 @@ The pipeline has three stages:
 
 ## What you need to install
 
-### Docker (for Elasticsearch only)
+### Colima (for Elasticsearch only)
 
-Docker is the only dependency for Elasticsearch. You do not need to install ES locally.
+Colima is a free, open-source container runtime for macOS. It replaces Docker Desktop with no licensing restrictions and uses the same `docker` and `docker-compose` commands.
 
-Install Docker Desktop: https://docs.docker.com/get-docker/
+```bash
+brew install colima docker docker-compose
+```
+
+Start Colima before any `docker-compose` commands:
+```bash
+colima start
+```
 
 Verify:
 ```bash
 docker --version
 ```
+
+Colima must be running whenever you use Elasticsearch. It does not start automatically on login — run `colima start` at the beginning of each work session, or add it to your shell profile.
 
 ### Python environment (venv required)
 
@@ -131,6 +140,7 @@ Keep your config files (which reference your dataset names) in a separate reposi
 ### Step 1 — Start Elasticsearch
 
 ```bash
+colima start   # if not already running
 docker-compose up -d elasticsearch
 ```
 
@@ -274,14 +284,14 @@ for hit in drs:
 
 ## Do I need Docker, a venv, or both?
 
-| Component | Docker | venv |
+| Component | Colima + docker-compose | venv |
 |---|---|---|
 | Elasticsearch | Required | Not applicable |
 | `bq_profiler` | Not needed | Required |
 | `networkbuildercoordinator.py` | Not needed | Required |
 | Aurum API / Jupyter | Not needed | Required |
 
-**Short answer:** Run Elasticsearch in Docker, run everything else in a Python venv on your machine.
+**Short answer:** Run Elasticsearch via Colima, run everything else in a Python venv on your machine. Docker Desktop is not required — Colima is a free drop-in replacement with no licensing restrictions.
 
 The original `docker-compose.yml` includes containers for the Java profiler and networkbuilder. Ignore those — they are replaced by the Python profiler and the host-based Python networkbuilder.
 
@@ -293,7 +303,7 @@ The original `docker-compose.yml` includes containers for the Java profiler and 
 ```
 ConnectionError: Connection refused localhost:9200
 ```
-Elasticsearch is not running. Run `docker-compose up -d elasticsearch` and wait 10–15 seconds for it to start.
+Either Colima is not running (`colima start`) or Elasticsearch is not running (`docker-compose up -d elasticsearch`). Wait 10–15 seconds after starting ES before retrying.
 
 **BQ permission denied**
 ```
