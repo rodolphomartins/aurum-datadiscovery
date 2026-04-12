@@ -94,13 +94,13 @@ source .venv/bin/activate          # macOS / Linux
 # .venv\Scripts\activate           # Windows
 ```
 
-Install dependencies using the lean requirements file (excludes web server, databases, RDF tools):
+With the venv active, install dependencies using the lean requirements file (excludes web server, databases, RDF tools):
 ```bash
 pip install -r requirements-lite.txt
 pip install -e .
 ```
 
-The `-e .` installs `bq_profiler` as an editable package so it can be imported from anywhere.
+Both commands must run **inside the activated venv** (you should see `(.venv)` in your prompt). The `-e .` installs `bq_profiler` as an editable package into the venv so it can be imported by any script running in that venv. Running it outside the venv installs into system Python and the venv will not see it.
 
 > **Note:** The original `requirements.txt` is kept for reference but contains many dependencies not needed for BigQuery usage (Flask, Django, uWSGI, PostgreSQL, MongoDB, Neo4j, etc.). Use `requirements-lite.txt` for all new setups.
 
