@@ -25,7 +25,7 @@ def load_config(path: str) -> dict:
 _LOCALHOST_ALIASES = {"localhost", "127.0.0.1", "::1"}
 
 
-def run(config_path: str, sample_pct: float = None, dry_run: bool = False):
+def run(config_path: str, dry_run: bool = False):
     cfg = load_config(config_path)
 
     billing_project = cfg["bigquery"]["project"]
@@ -33,10 +33,7 @@ def run(config_path: str, sample_pct: float = None, dry_run: bool = False):
     dataset = cfg["bigquery"]["dataset"]
     tables = cfg["bigquery"]["tables"]
     db_name = cfg.get("db_name", dataset)
-    effective_sample_pct = sample_pct if sample_pct is not None else cfg.get("sample_pct", 1.0)
-
-    if not (0 < effective_sample_pct <= 100):
-        raise ValueError(f"sample_pct must be between 0 (exclusive) and 100 (inclusive), got {effective_sample_pct}")
+    sample_limit = cfg.get("sample_limit", 100_000)
 
     es_host = cfg.get("elasticsearch", {}).get("host", "localhost")
     es_port = cfg.get("elasticsearch", {}).get("port", 9200)
@@ -63,7 +60,7 @@ def run(config_path: str, sample_pct: float = None, dry_run: bool = False):
         print(f"  {'T' if is_text else 'N'} {col_meta.table}.{col_meta.column} ...", end=" ")
 
         if is_text:
-            sample = sample_column(bq_client, col_meta, sample_pct=effective_sample_pct)
+            sample = sample_column(bq_client, col_meta, limit=sample_limit)
         else:
             sample = sample_numeric_column(bq_client, col_meta)
 
@@ -94,10 +91,9 @@ def run(config_path: str, sample_pct: float = None, dry_run: bool = False):
 def main():
     parser = argparse.ArgumentParser(description="BQ Profiler — Aurum Python profiler for BigQuery")
     parser.add_argument("--config", required=True, help="Path to YAML config file")
-    parser.add_argument("--sample_pct", type=float, default=None, help="Override sample percentage (e.g. 1.0)")
     parser.add_argument("--dry_run", action="store_true", help="Compute profiles but do not push to ES")
     args = parser.parse_args()
-    run(args.config, sample_pct=args.sample_pct, dry_run=args.dry_run)
+    run(args.config, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

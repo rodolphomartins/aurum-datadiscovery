@@ -15,11 +15,10 @@ bigquery:
 # Namespace label used in the EKG — typically the dataset name
 db_name: "your_dataset"
 
-# Percentage of rows to sample for MinHash content signatures.
-# BigQuery charges per bytes scanned.
-# 1.0 = 1% sample (cheap, good for exploration)
-# 10.0 = 10% sample (better recall for rare values, ~10x more expensive)
-sample_pct: 1.0
+# Max rows fetched per text column for MinHash signatures.
+# TABLESAMPLE is not used — works on both base tables and views.
+# 100000 is a good default. Lower for faster runs during exploration.
+sample_limit: 100000
 
 elasticsearch:
   host: "localhost"

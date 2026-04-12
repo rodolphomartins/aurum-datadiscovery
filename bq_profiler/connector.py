@@ -85,12 +85,11 @@ def get_columns(
 def sample_column(
     client: bigquery.Client,
     meta: ColumnMeta,
-    sample_pct: float = 1.0,
     limit: int = 100_000,
 ) -> ColumnSample:
     """
-    Sample text column values and compute cardinality.
-    Costs BQ scan proportional to sample_pct.
+    Fetch up to `limit` non-null values from a text column for MinHash.
+    Uses LIMIT rather than TABLESAMPLE — works on both base tables and views.
     """
     col = _safe_column(meta.column)
     fqtn = f"`{meta.project}.{meta.dataset}.{meta.table}`"
@@ -98,7 +97,6 @@ def sample_column(
     sample_query = f"""
     SELECT CAST(`{col}` AS STRING) AS val
     FROM {fqtn}
-    TABLESAMPLE SYSTEM ({sample_pct} PERCENT)
     WHERE `{col}` IS NOT NULL
     LIMIT {limit}
     """
