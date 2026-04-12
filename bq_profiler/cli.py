@@ -28,7 +28,8 @@ _LOCALHOST_ALIASES = {"localhost", "127.0.0.1", "::1"}
 def run(config_path: str, sample_pct: float = None, dry_run: bool = False):
     cfg = load_config(config_path)
 
-    bq_project = cfg["bigquery"]["project"]
+    billing_project = cfg["bigquery"]["project"]
+    data_project = cfg["bigquery"].get("data_project", billing_project)
     dataset = cfg["bigquery"]["dataset"]
     tables = cfg["bigquery"]["tables"]
     db_name = cfg.get("db_name", dataset)
@@ -46,10 +47,12 @@ def run(config_path: str, sample_pct: float = None, dry_run: bool = False):
             f"remote Elasticsearch instance is not allowed. Use localhost only."
         )
 
-    bq_client = bigquery.Client(project=bq_project)
+    # billing_project = where jobs run (needs bigquery.jobs.create)
+    # data_project = where tables live (needs bigquery.dataViewer)
+    bq_client = bigquery.Client(project=billing_project)
     es = Elasticsearch([{"host": es_host, "port": es_port}])
 
-    columns = list(get_columns(bq_client, bq_project, dataset, tables))
+    columns = list(get_columns(bq_client, data_project, dataset, tables))
     print(f"Found {len(columns)} columns across {len(tables)} tables.")
 
     profiles = []

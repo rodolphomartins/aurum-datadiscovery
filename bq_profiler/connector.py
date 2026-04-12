@@ -52,13 +52,13 @@ class ColumnSample:
 
 def get_columns(
     client: bigquery.Client,
-    project: str,
+    data_project: str,
     dataset: str,
     tables: List[str],
 ) -> Iterator[ColumnMeta]:
     """
     Fetch column metadata from INFORMATION_SCHEMA.COLUMNS.
-    Free — no table scan.
+    Free — no table scan. client must be initialised with the billing project.
     """
     query = f"""
     SELECT
@@ -66,7 +66,7 @@ def get_columns(
         column_name,
         data_type,
         description
-    FROM `{project}.{dataset}.INFORMATION_SCHEMA.COLUMNS`
+    FROM `{data_project}.{dataset}.INFORMATION_SCHEMA.COLUMNS`
     WHERE table_name IN UNNEST(@tables)
     ORDER BY table_name, ordinal_position
     """
@@ -77,7 +77,7 @@ def get_columns(
     )
     for row in client.query(query, job_config=job_config).result():
         yield ColumnMeta(
-            project=project,
+            project=data_project,
             dataset=dataset,
             table=row.table_name,
             column=row.column_name,

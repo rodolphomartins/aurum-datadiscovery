@@ -3,7 +3,9 @@
 #   python -m bq_profiler.cli --config your_config.yaml
 
 bigquery:
-  project: "your-gcp-project-id"
+  project: "your-billing-project"       # jobs are created here (needs bigquery.jobs.create)
+  data_project: "your-data-project"     # tables live here (needs bigquery.dataViewer)
+                                         # omit data_project if billing and data project are the same
   dataset: "your_dataset"
   tables:
     - "table_one"
