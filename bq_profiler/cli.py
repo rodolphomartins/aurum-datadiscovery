@@ -7,14 +7,51 @@ Usage:
 """
 
 import argparse
+import re
 import yaml
 
+from google.api_core.exceptions import BadRequest
 from google.cloud import bigquery
 from elasticsearch import Elasticsearch
 
-from bq_profiler.connector import get_columns, build_partition_map, sample_column, sample_numeric_column, is_text_type
+from bq_profiler.connector import (
+    ColumnMeta, get_columns, build_partition_map,
+    sample_column, sample_numeric_column, is_text_type,
+)
 from bq_profiler.profiler import profile
 from bq_profiler.push_to_es import push_profiles, push_text_index
+
+_PARTITION_REQUIRED_RE = re.compile(r"without a filter over column\(s\) '([^']+)'")
+
+
+def _fallback_partition_col(error: BadRequest, col_meta: ColumnMeta, columns: list) -> ColumnMeta | None:
+    """
+    When BQ rejects a query for a missing partition filter, extract the required
+    column name from the error message and find its ColumnMeta in the already-fetched
+    columns list — matched by (table == col_meta.table) to avoid cross-table collisions.
+
+    Returns None if the column cannot be resolved (logged by caller).
+    """
+    m = _PARTITION_REQUIRED_RE.search(str(error))
+    if not m:
+        return None
+    required_col = m.group(1)
+    match = next(
+        (c for c in columns if c.table == col_meta.table and c.column == required_col),
+        None,
+    )
+    if match is None:
+        # Column not in view's INFORMATION_SCHEMA (rare). Fall back to DATE as safe default.
+        return ColumnMeta(
+            project=col_meta.project, dataset=col_meta.dataset,
+            table=col_meta.table, column=required_col,
+            data_type="DATE", is_partitioning_column=True,
+        )
+    return ColumnMeta(
+        project=match.project, dataset=match.dataset,
+        table=match.table, column=match.column,
+        data_type=match.data_type, is_partitioning_column=True,
+    )
 
 
 def load_config(path: str) -> dict:
@@ -63,10 +100,23 @@ def run(config_path: str, dry_run: bool = False):
         print(f"  {'T' if is_text else 'N'} {col_meta.table}.{col_meta.column} ...", end=" ")
 
         partition_col = partition_map.get(col_meta.table)
-        if is_text:
-            sample = sample_column(bq_client, col_meta, limit=sample_limit, partition_col=partition_col)
-        else:
-            sample = sample_numeric_column(bq_client, col_meta, partition_col=partition_col)
+        try:
+            if is_text:
+                sample = sample_column(bq_client, col_meta, limit=sample_limit, partition_col=partition_col)
+            else:
+                sample = sample_numeric_column(bq_client, col_meta, partition_col=partition_col)
+        except BadRequest as e:
+            if "without a filter over column" not in str(e):
+                raise
+            fallback = _fallback_partition_col(e, col_meta, columns)
+            if fallback is None:
+                print(f"SKIP (partition filter required but column unresolvable: {e})")
+                continue
+            print(f"retrying with partition filter on '{fallback.column}' (view metadata gap) ... ", end="")
+            if is_text:
+                sample = sample_column(bq_client, col_meta, limit=sample_limit, partition_col=fallback)
+            else:
+                sample = sample_numeric_column(bq_client, col_meta, partition_col=fallback)
 
         p = profile(sample, db_name=db_name)
         profiles.append(p)
