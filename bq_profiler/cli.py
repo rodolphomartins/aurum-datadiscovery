@@ -126,9 +126,9 @@ def run(config_path: str, dry_run: bool = False):
             samples_by_id[p.id] = sample.values
 
         stats_str = (
-            f"unique_ratio={p.uniquenessRatio:.3f}, minhash_len={len(p.minhash)}"
+            f"distinct={p.uniqueValues}, total={p.totalValues}, unique_ratio={p.uniquenessRatio:.6f}, minhash_len={len(p.minhash)}"
             if is_text else
-            f"min={p.minValue:.2f}, max={p.maxValue:.2f}, median={p.median:.2f}, iqr={p.iqr:.2f}"
+            f"distinct={p.uniqueValues}, total={p.totalValues}, min={p.minValue:.2f}, max={p.maxValue:.2f}, median={p.median:.2f}, iqr={p.iqr:.2f}"
         )
         print(f"done ({stats_str})")
 
