@@ -44,7 +44,7 @@ def compute_nid(db_name: str, source_name: str, column_name: str) -> str:
     return str(binascii.crc32(raw.encode("utf-8")))
 
 
-def compute_minhash(values: List[str], num_perm: int = 128) -> List[int]:
+def compute_minhash(values: List[str], num_perm: int = 512) -> List[int]:
     m = MinHash(num_perm=num_perm)
     for v in values:
         m.update(v.encode("utf-8"))
@@ -65,7 +65,7 @@ def tokenize_column_name(column_name: str) -> List[str]:
     return [t.lower() for t in tokens if len(t) > 1]
 
 
-def profile(sample: ColumnSample, db_name: str, num_perm: int = 128) -> ColumnProfile:
+def profile(sample: ColumnSample, db_name: str, num_perm: int = 512) -> ColumnProfile:
     meta = sample.meta
     nid = compute_nid(db_name, meta.table, meta.column)
     data_type = "T" if is_text_type(meta.data_type) else "N"

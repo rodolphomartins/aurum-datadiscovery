@@ -234,11 +234,17 @@ def build_content_sim_mh_text(network, mh_signatures):
     # Materialize signatures for convenience
     mh_sig_obj = []
 
-    content_index = MinHashLSH(threshold=0.7, num_perm=512)
+    # num_perm must match what the profiler used.
+    # Use the first valid signature to detect num_perm — skip sentinels (e.g. [-1]).
+    valid_sigs = [(nid, sig) for nid, sig in mh_signatures if len(sig) > 1]
+    if not valid_sigs:
+        return MinHashLSH(threshold=0.5, num_perm=128)
+    num_perm = len(valid_sigs[0][1])
+    content_index = MinHashLSH(threshold=0.5, num_perm=num_perm)
 
     # Create minhash objects and index
-    for nid, mh_sig in mh_signatures:
-        mh_obj = MinHash(num_perm=512)
+    for nid, mh_sig in valid_sigs:
+        mh_obj = MinHash(num_perm=num_perm)
         mh_array = np.asarray(mh_sig, dtype=int)
         mh_obj.hashvalues = mh_array
         content_index.insert(nid, mh_obj)

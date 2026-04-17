@@ -48,7 +48,7 @@ class StoreHandler:
                                          'hits.hits._source.path'
                                          ]
                             )
-        if res['hits']['total'] == 0:
+        if res['hits']['total']['value'] == 0:
             print("!!!")
             print("nid not found in store: are you using the right EKG and store?")
             print("!!!")
@@ -78,7 +78,7 @@ class StoreHandler:
                                          'hits.hits._source.dataType']
                             )
         scroll_id = res['_scroll_id']
-        remaining = res['hits']['total']
+        remaining = res['hits']['total']['value']
         while remaining > 0:
             hits = res['hits']['hits']
             for h in hits:
@@ -122,7 +122,7 @@ class StoreHandler:
                             filter_path=filter_path
                             )
         scroll_id = res['_scroll_id']
-        remaining = res['hits']['total']
+        remaining = res['hits']['total']['value']
         while remaining > 0:
             hits = res['hits']['hits']
             for h in hits:
@@ -175,7 +175,7 @@ class StoreHandler:
                           "query": {"term": {"sourceNameNA": keywords}}}
         res = client.search(index=index, body=query_body,
                             filter_path=filter_path)
-        if res['hits']['total'] == 0:
+        if res['hits']['total']['value'] == 0:
             return []
         for el in res['hits']['hits']:
             data = Hit(str(el['_source']['id']), el['_source']['dbName'], el['_source']['sourceName'],
@@ -215,7 +215,7 @@ class StoreHandler:
                           "query": {"match": {"sourceName": keywords}}}
         res = client.search(index=index, body=query_body,
                             filter_path=filter_path)
-        if res['hits']['total'] == 0:
+        if res['hits']['total']['value'] == 0:
             return []
         for el in res['hits']['hits']:
             data = Hit(str(el['_source']['id']), el['_source']['dbName'], el['_source']['sourceName'],
@@ -249,7 +249,7 @@ class StoreHandler:
             }
         res = client.search(index=index, body=query_body,
                             filter_path=filter_path)
-        if res['hits']['total'] == 0:
+        if res['hits']['total']['value'] == 0:
             return []
         for el in res['hits']['hits']:
             data = Hit(str(el['_source']['id']), el['_source']['dbName'], el['_source']['sourceName'],
@@ -328,7 +328,7 @@ class StoreHandler:
                                          ]
                             )
         scroll_id = res['_scroll_id']
-        remaining = res['hits']['total']
+        remaining = res['hits']['total']['value']
         while remaining > 0:
             hits = res['hits']['hits']
             for h in hits:
@@ -403,7 +403,7 @@ class StoreHandler:
         :return: (fields, numsignatures)
         """
         query_body = {
-            "query": {"bool": {"filter": [{"term": {"dataType": "T"}}]}}}
+            "query": {"bool": {"filter": [{"term": {"dataType.keyword": "T"}}]}}}
         res = client.search(index='profile', body=query_body, scroll="10m",
                             filter_path=['_scroll_id',
                                          'hits.hits._id',
@@ -411,7 +411,7 @@ class StoreHandler:
                                          'hits.hits._source.minhash']
                             )
         scroll_id = res['_scroll_id']
-        remaining = res['hits']['total']
+        remaining = res['hits']['total']['value']
 
         id_sig = []
         while remaining > 0:
@@ -435,7 +435,7 @@ class StoreHandler:
         :return: (fields, numsignatures)
         """
         query_body = {
-            "query": {"bool": {"filter": [{"term": {"dataType": "N"}}]}}}
+            "query": {"bool": {"filter": [{"term": {"dataType.keyword": "N"}}]}}}
         res = client.search(index='profile', body=query_body, scroll="10m",
                             filter_path=['_scroll_id',
                                          'hits.hits._id',
@@ -446,7 +446,7 @@ class StoreHandler:
                                          'hits.hits._source.maxValue']
                             )
         scroll_id = res['_scroll_id']
-        remaining = res['hits']['total']
+        remaining = res['hits']['total']['value']
 
         id_sig = []
         while remaining > 0:
@@ -521,7 +521,7 @@ class StoreHandler:
         """
         res = client.search(index='metadata', doc_type='annotation',
                             body={"query": {"terms": {"_id": [md_id]}}})
-        if res["hits"]["total"] == 0:
+        if res["hits"]["total"]["value"] == 0:
             raise ValueError("Given md_id does not exist.")
 
         timestamp = self._current_time()
@@ -562,7 +562,7 @@ class StoreHandler:
                        'hits.hits._source.text']
 
         res = client.search(index=index, body=body, filter_path=filter_path)
-        if res['hits']['total'] == 0:
+        if res['hits']['total']['value'] == 0:
             return []
 
         for el in res['hits']['hits']:
@@ -592,7 +592,7 @@ class StoreHandler:
 
         res = client.search(index='metadata', doc_type='annotation',
                             body={"query": {"terms": {"_id": [md_id]}}})
-        if res["hits"]["total"] == 0:
+        if res["hits"]["total"]["value"] == 0:
             raise ValueError("Given md_id does not exist.")
 
         source = res["hits"]["hits"][0]["_source"]
@@ -657,7 +657,7 @@ class StoreHandler:
                             'hits.hits._source.target',
                             'hits.hits._source.text'])
 
-        if res["hits"]["total"] == 0:
+        if res["hits"]["total"]["value"] == 0:
             return
 
         md_hits = []
@@ -698,7 +698,7 @@ class StoreHandler:
                             'hits.hits._source.author',
                             'hits.hits._source.text'])
 
-        if res["hits"]["total"] == 0:
+        if res["hits"]["total"]["value"] == 0:
             return
 
         for md in res["hits"]["hits"]:

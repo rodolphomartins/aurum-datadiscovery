@@ -3,10 +3,35 @@ BigQuery connector — fetches schema metadata and content samples.
 No profiling logic here; returns raw data for profiler.py to process.
 """
 
+import signal
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Dict, Iterator, List, Optional
 
 from google.cloud import bigquery
+
+
+class BQQueryTimeout(Exception):
+    """Raised when a BQ sample call exceeds its hard deadline."""
+    pass
+
+
+@contextmanager
+def _query_deadline(seconds: int):
+    """
+    Hard deadline using SIGALRM. Unlike result(timeout=), this interrupts
+    blocking socket reads during result pagination — the actual hang point.
+    Only works on macOS/Linux (main thread only).
+    """
+    def _handler(signum, frame):
+        raise BQQueryTimeout(f"BQ call exceeded {seconds}s deadline (socket-level hang)")
+    old_handler = signal.signal(signal.SIGALRM, _handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
 
 _TEXT_TYPES = {
     "STRING", "BYTES", "DATE", "DATETIME", "TIMESTAMP", "TIME", "BOOL", "BOOLEAN"
@@ -91,7 +116,7 @@ def get_columns(
             bigquery.ArrayQueryParameter("tables", "STRING", tables)
         ]
     )
-    for row in client.query(query, job_config=job_config).result():
+    for row in client.query(query, job_config=job_config).result(timeout=120):
         yield ColumnMeta(
             project=data_project,
             dataset=dataset,
@@ -120,6 +145,7 @@ def sample_column(
     limit: int = 100_000,
     partition_col: Optional[ColumnMeta] = None,
     partition_days: int = 7,
+    query_timeout: int = 120,
 ) -> ColumnSample:
     """
     Fetch up to `limit` non-null values from a text column for MinHash.
@@ -140,8 +166,6 @@ def sample_column(
     WHERE `{col}` IS NOT NULL {partition_clause}
     LIMIT {limit}
     """
-    values = [row.val for row in client.query(sample_query).result()]
-
     card_query = f"""
     SELECT
         APPROX_COUNT_DISTINCT(`{col}`) AS approx_distinct,
@@ -149,7 +173,9 @@ def sample_column(
     FROM {fqtn}
     WHERE `{col}` IS NOT NULL {partition_clause}
     """
-    row = next(iter(client.query(card_query).result()))
+    with _query_deadline(query_timeout):
+        values = [row.val for row in client.query(sample_query).result(timeout=query_timeout)]
+        row = next(iter(client.query(card_query).result(timeout=query_timeout)))
 
     return ColumnSample(
         meta=meta,
@@ -164,6 +190,7 @@ def sample_numeric_column(
     meta: ColumnMeta,
     partition_col: Optional[ColumnMeta] = None,
     partition_days: int = 7,
+    query_timeout: int = 120,
 ) -> ColumnSample:
     """
     Compute numeric statistics for a numeric column.
@@ -190,7 +217,8 @@ def sample_numeric_column(
     FROM {fqtn}
     WHERE `{col}` IS NOT NULL {partition_clause}
     """
-    row = next(iter(client.query(query).result()))
+    with _query_deadline(query_timeout):
+        row = next(iter(client.query(query).result(timeout=query_timeout)))
     q = list(row.quantiles)  # [min, q25, median, q75, max]
 
     return ColumnSample(

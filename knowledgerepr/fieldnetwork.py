@@ -78,7 +78,7 @@ class FieldNetwork:
         return hits
 
     def get_cardinality_of(self, node_id):
-        c = self.__G.node[node_id]
+        c = self.__G.nodes[node_id]
         card = c['cardinality']
         if card is None:
             return 0  # no cardinality is like card 0
@@ -150,7 +150,7 @@ class FieldNetwork:
         :return:
         """
         score = {'score': score}
-        self.__G.add_edge(node_src, node_target, relation, score)
+        self.__G.add_edge(node_src, node_target, key=relation, **score)
 
     def fields_degree(self, topk):
         degree = self.__G.degree()
@@ -439,7 +439,7 @@ def serialize_network_to_csv(network, path):
     nodes = set()
     G = network._get_underlying_repr_graph()
     with open(path + "edges.csv", 'w') as f:
-        for src, tgt in G.edges_iter(data=False):
+        for src, tgt in G.edges(data=False):
             s = str(src) + "," + str(tgt) + "," + "1\n"
             nodes.add(src)
             nodes.add(tgt)

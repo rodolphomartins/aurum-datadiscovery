@@ -8,14 +8,16 @@ Usage:
 
 import argparse
 import re
+import traceback
 import yaml
+from itertools import groupby
 
 from google.api_core.exceptions import BadRequest
 from google.cloud import bigquery
 from elasticsearch import Elasticsearch
 
 from bq_profiler.connector import (
-    ColumnMeta, get_columns, build_partition_map,
+    ColumnMeta, BQQueryTimeout, get_columns, build_partition_map,
     sample_column, sample_numeric_column, is_text_type,
 )
 from bq_profiler.profiler import profile
@@ -113,43 +115,72 @@ def run(config_path: str, dry_run: bool = False):
 
     profiles = []
     samples_by_id = {}  # profile.id -> List[str] values, for text index
+    query_timeout = cfg.get("query_timeout", 120)
 
-    for col_meta in columns:
-        is_text = is_text_type(col_meta.data_type)
-        print(f"  {'T' if is_text else 'N'} {col_meta.dataset}.{col_meta.table}.{col_meta.column} ...", end=" ")
+    # Group columns by (dataset, table) — columns list is already ordered by table
+    for (dataset, table), table_col_iter in groupby(columns, key=lambda c: (c.dataset, c.table)):
+        table_cols = list(table_col_iter)
+        total_cols = len(table_cols)
+        profiled = 0
+        print(f"\n[{dataset}.{table}] starting — {total_cols} columns", flush=True)
 
-        partition_col = partition_map.get((col_meta.dataset, col_meta.table))
         try:
-            if is_text:
-                sample = sample_column(bq_client, col_meta, limit=sample_limit, partition_col=partition_col)
-            else:
-                sample = sample_numeric_column(bq_client, col_meta, partition_col=partition_col)
-        except BadRequest as e:
-            if "without a filter over column" not in str(e):
-                raise
-            fallback = _fallback_partition_col(e, col_meta, columns)
-            if fallback is None:
-                print(f"SKIP (partition filter required but column unresolvable: {e})")
-                continue
-            print(f"retrying with partition filter on '{fallback.column}' (view metadata gap) ... ", end="")
-            partition_map[(col_meta.dataset, col_meta.table)] = fallback  # cache for remaining columns
-            if is_text:
-                sample = sample_column(bq_client, col_meta, limit=sample_limit, partition_col=fallback)
-            else:
-                sample = sample_numeric_column(bq_client, col_meta, partition_col=fallback)
+            for i, col_meta in enumerate(table_cols, 1):
+                is_text = is_text_type(col_meta.data_type)
+                print(f"  [{i}/{total_cols}] {'T' if is_text else 'N'} {col_meta.column} ...", end=" ", flush=True)
 
-        p = profile(sample, db_name=db_name)
-        profiles.append(p)
+                partition_col = partition_map.get((col_meta.dataset, col_meta.table))
+                try:
+                    if is_text:
+                        sample = sample_column(bq_client, col_meta, limit=sample_limit,
+                                               partition_col=partition_col, query_timeout=query_timeout)
+                    else:
+                        sample = sample_numeric_column(bq_client, col_meta,
+                                                       partition_col=partition_col, query_timeout=query_timeout)
+                except BQQueryTimeout as e:
+                    print(f"SKIP (timeout: {e})", flush=True)
+                    continue
+                except BadRequest as e:
+                    if "without a filter over column" not in str(e):
+                        print(f"SKIP (BQ error: {e})", flush=True)
+                        continue
+                    fallback = _fallback_partition_col(e, col_meta, columns)
+                    if fallback is None:
+                        print(f"SKIP (partition filter required but column unresolvable)", flush=True)
+                        continue
+                    print(f"retrying with partition filter on '{fallback.column}' (view metadata gap) ... ",
+                          end="", flush=True)
+                    partition_map[(col_meta.dataset, col_meta.table)] = fallback
+                    if is_text:
+                        sample = sample_column(bq_client, col_meta, limit=sample_limit,
+                                               partition_col=fallback, query_timeout=query_timeout)
+                    else:
+                        sample = sample_numeric_column(bq_client, col_meta,
+                                                       partition_col=fallback, query_timeout=query_timeout)
 
-        if is_text and sample.values:
-            samples_by_id[p.id] = sample.values
+                p = profile(sample, db_name=db_name)
+                profiles.append(p)
+                profiled += 1
 
-        stats_str = (
-            f"distinct={p.uniqueValues}, total={p.totalValues}, unique_ratio={p.uniquenessRatio:.6f}, minhash_len={len(p.minhash)}"
-            if is_text else
-            f"distinct={p.uniqueValues}, total={p.totalValues}, min={p.minValue:.2f}, max={p.maxValue:.2f}, median={p.median:.2f}, iqr={p.iqr:.2f}"
-        )
-        print(f"done ({stats_str})")
+                if is_text and sample.values:
+                    samples_by_id[p.id] = sample.values
+
+                stats_str = (
+                    f"distinct={p.uniqueValues}, total={p.totalValues}, "
+                    f"unique_ratio={p.uniquenessRatio:.6f}, minhash_len={len(p.minhash)}"
+                    if is_text else
+                    f"distinct={p.uniqueValues}, total={p.totalValues}, "
+                    f"min={p.minValue:.2f}, max={p.maxValue:.2f}, median={p.median:.2f}, iqr={p.iqr:.2f}"
+                )
+                print(f"done ({stats_str})", flush=True)
+
+        except Exception as e:
+            print(f"\n  ERROR on [{dataset}.{table}] after {profiled}/{total_cols} columns: {e}", flush=True)
+            traceback.print_exc()
+            print(f"  Skipping to next table.", flush=True)
+            continue
+
+        print(f"[{dataset}.{table}] done — {profiled}/{total_cols} columns profiled.", flush=True)
 
     if dry_run:
         print(f"\nDry run: {len(profiles)} profiles computed, not pushed to ES.")
