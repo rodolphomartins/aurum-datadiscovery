@@ -6,14 +6,25 @@ bigquery:
   project: "your-billing-project"       # jobs are created here (needs bigquery.jobs.create)
   data_project: "your-data-project"     # tables live here (needs bigquery.dataViewer)
                                          # omit data_project if billing and data project are the same
-  dataset: "your_dataset"
-  tables:
-    - "table_one"
-    - "table_two"
-    - "table_three"
 
-# Namespace label used in the EKG — typically the dataset name
-db_name: "your_dataset"
+  # Multi-dataset form (preferred): list one entry per dataset
+  datasets:
+    - name: "your_dataset_a"
+      tables:
+        - "table_one"
+        - "table_two"
+    - name: "your_dataset_b"
+      tables:
+        - "table_three"
+
+  # Single-dataset shorthand (still supported for backwards compat):
+  # dataset: "your_dataset"
+  # tables:
+  #   - "table_one"
+
+# Namespace label used in the EKG.
+# For multi-dataset runs, use a logical group name (e.g. the data project or domain).
+db_name: "your_db_name"
 
 # Max rows fetched per text column for MinHash signatures.
 # TABLESAMPLE is not used — works on both base tables and views.

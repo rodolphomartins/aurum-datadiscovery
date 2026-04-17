@@ -28,7 +28,7 @@ def _fallback_partition_col(error: BadRequest, col_meta: ColumnMeta, columns: li
     """
     When BQ rejects a query for a missing partition filter, extract the required
     column name from the error message and find its ColumnMeta in the already-fetched
-    columns list — matched by (table == col_meta.table) to avoid cross-table collisions.
+    columns list — matched by (dataset, table) to avoid cross-dataset/table collisions.
 
     Returns None if the column cannot be resolved (logged by caller).
     """
@@ -37,7 +37,8 @@ def _fallback_partition_col(error: BadRequest, col_meta: ColumnMeta, columns: li
         return None
     required_col = m.group(1)
     match = next(
-        (c for c in columns if c.table == col_meta.table and c.column == required_col),
+        (c for c in columns
+         if c.dataset == col_meta.dataset and c.table == col_meta.table and c.column == required_col),
         None,
     )
     if match is None:
@@ -59,6 +60,17 @@ def load_config(path: str) -> dict:
         return yaml.safe_load(f)
 
 
+def _normalize_datasets(bq_cfg: dict) -> list[tuple[str, list[str]]]:
+    """
+    Return a list of (dataset_name, [table, ...]) from either config form:
+      - New: bigquery.datasets = [{name: ..., tables: [...]}, ...]
+      - Old: bigquery.dataset + bigquery.tables
+    """
+    if "datasets" in bq_cfg:
+        return [(entry["name"], entry["tables"]) for entry in bq_cfg["datasets"]]
+    return [(bq_cfg["dataset"], bq_cfg["tables"])]
+
+
 _LOCALHOST_ALIASES = {"localhost", "127.0.0.1", "::1"}
 
 
@@ -67,9 +79,8 @@ def run(config_path: str, dry_run: bool = False):
 
     billing_project = cfg["bigquery"]["project"]
     data_project = cfg["bigquery"].get("data_project", billing_project)
-    dataset = cfg["bigquery"]["dataset"]
-    tables = cfg["bigquery"]["tables"]
-    db_name = cfg.get("db_name", dataset)
+    dataset_entries = _normalize_datasets(cfg["bigquery"])
+    db_name = cfg.get("db_name", dataset_entries[0][0])
     sample_limit = cfg.get("sample_limit", 100_000)
 
     es_host = cfg.get("elasticsearch", {}).get("host", "localhost")
@@ -86,20 +97,28 @@ def run(config_path: str, dry_run: bool = False):
     bq_client = bigquery.Client(project=billing_project)
     es = Elasticsearch([{"host": es_host, "port": es_port}])
 
-    columns = list(get_columns(bq_client, data_project, dataset, tables))
-    partition_map = build_partition_map(columns)
-    print(f"Found {len(columns)} columns across {len(tables)} tables.")
+    # Fetch columns across all datasets; partition_map keyed by (dataset, table)
+    columns = []
+    for dataset, tables in dataset_entries:
+        dataset_cols = list(get_columns(bq_client, data_project, dataset, tables))
+        columns.extend(dataset_cols)
+        print(f"Found {len(dataset_cols)} columns across {len(tables)} tables in '{dataset}'.")
+
+    partition_map = {
+        (col.dataset, col.table): col
+        for col in build_partition_map(columns).values()
+    }
     if partition_map:
-        print(f"Partition columns detected: { {t: c.column for t, c in partition_map.items()} }")
+        print(f"Partition columns detected: { {f'{d}.{t}': c.column for (d, t), c in partition_map.items()} }")
 
     profiles = []
     samples_by_id = {}  # profile.id -> List[str] values, for text index
 
     for col_meta in columns:
         is_text = is_text_type(col_meta.data_type)
-        print(f"  {'T' if is_text else 'N'} {col_meta.table}.{col_meta.column} ...", end=" ")
+        print(f"  {'T' if is_text else 'N'} {col_meta.dataset}.{col_meta.table}.{col_meta.column} ...", end=" ")
 
-        partition_col = partition_map.get(col_meta.table)
+        partition_col = partition_map.get((col_meta.dataset, col_meta.table))
         try:
             if is_text:
                 sample = sample_column(bq_client, col_meta, limit=sample_limit, partition_col=partition_col)
@@ -113,7 +132,7 @@ def run(config_path: str, dry_run: bool = False):
                 print(f"SKIP (partition filter required but column unresolvable: {e})")
                 continue
             print(f"retrying with partition filter on '{fallback.column}' (view metadata gap) ... ", end="")
-            partition_map[col_meta.table] = fallback  # cache: remaining columns skip the error path
+            partition_map[(col_meta.dataset, col_meta.table)] = fallback  # cache for remaining columns
             if is_text:
                 sample = sample_column(bq_client, col_meta, limit=sample_limit, partition_col=fallback)
             else:
