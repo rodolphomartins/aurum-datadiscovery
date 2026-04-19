@@ -17,7 +17,7 @@ from google.cloud import bigquery
 from elasticsearch import Elasticsearch
 
 from bq_profiler.connector import (
-    ColumnMeta, BQQueryTimeout, get_columns, build_partition_map,
+    ColumnMeta, BQQueryTimeout, BQEmptySample, get_columns, build_partition_map,
     sample_column, sample_numeric_column, is_text_type,
 )
 from bq_profiler.profiler import profile
@@ -139,6 +139,9 @@ def run(config_path: str, dry_run: bool = False):
                                                        partition_col=partition_col, query_timeout=query_timeout)
                 except BQQueryTimeout as e:
                     print(f"SKIP (timeout: {e})", flush=True)
+                    continue
+                except BQEmptySample as e:
+                    print(f"SKIP (empty sample: {e})", flush=True)
                     continue
                 except BadRequest as e:
                     if "without a filter over column" not in str(e):

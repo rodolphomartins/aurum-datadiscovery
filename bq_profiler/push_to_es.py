@@ -39,7 +39,7 @@ def push_profiles(
             "median": p.median,
             "iqr": p.iqr,
         }
-        es.index(index=index, body=doc)
+        es.index(index=index, id=p.id, body=doc)
 
 
 def push_text_index(
@@ -66,4 +66,4 @@ def push_text_index(
             "columnNameSuggest": p.columnName,
             "text": values,
         }
-        es.index(index=index, body=doc)
+        es.index(index=index, id=p.id, body=doc)

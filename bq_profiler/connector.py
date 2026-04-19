@@ -16,6 +16,11 @@ class BQQueryTimeout(Exception):
     pass
 
 
+class BQEmptySample(Exception):
+    """Raised when a numeric column has no non-null rows in the sample window."""
+    pass
+
+
 @contextmanager
 def _query_deadline(seconds: int):
     """
@@ -219,7 +224,9 @@ def sample_numeric_column(
     """
     with _query_deadline(query_timeout):
         row = next(iter(client.query(query).result(timeout=query_timeout)))
-    q = list(row.quantiles)  # [min, q25, median, q75, max]
+    q = list(row.quantiles)  # [min, q25, median, q75, max] — empty if no non-null rows
+    if len(q) < 5:
+        raise BQEmptySample(f"no non-null values in sample window for numeric column '{col}'")
 
     return ColumnSample(
         meta=meta,
